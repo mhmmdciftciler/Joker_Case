@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "572252292730",
+    "firebase_url": "https://jockercase-20374-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "jockercase-20374",
+    "storage_bucket": "jockercase-20374.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:572252292730:android:02abbab3530e85d75c9dc3",
+        "android_client_info": {
+          "package_name": "com.muhammed.jokercase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKquAAvHwXwISyIfdruQvUipW9S1Fm0Io"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
