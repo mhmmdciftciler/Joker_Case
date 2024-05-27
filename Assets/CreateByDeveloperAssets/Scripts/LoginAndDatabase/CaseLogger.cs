@@ -17,6 +17,7 @@ public class CaseLogger : MonoBehaviour
             Instance = this;
         else
             Destroy(gameObject);
+        DontDestroyOnLoad(gameObject);
     }
     private void Update()
     {

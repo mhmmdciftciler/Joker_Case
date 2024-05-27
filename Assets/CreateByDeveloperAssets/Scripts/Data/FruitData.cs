@@ -5,8 +5,6 @@ using UnityEngine;
 public class FruitData : ScriptableObject
 {
     public string Name;
-    public string Description;
-    public int Value;//Meyvelerin birbirinden farklý parametreleri olsun istedim. Silinebilir.
     public Sprite Icon;
     public PoolObject CollectPrefab;
 }

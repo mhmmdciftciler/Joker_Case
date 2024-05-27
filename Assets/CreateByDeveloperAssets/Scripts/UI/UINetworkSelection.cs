@@ -6,15 +6,16 @@ using UnityEngine;
 
 public class UINetworkSelection : MonoBehaviour
 {
-    [SerializeField] NetworkManager networkManager;
-    [SerializeField] GameNetworkManager gameNetwork;
-    [SerializeField] TileManager tanager;
-    [SerializeField] GameObject SelectServerTypeMenu;
-    [SerializeField] TMP_InputField dice1;//The list must be added to increase the number of dice.
-    [SerializeField] TMP_InputField dice2;
+    [SerializeField] NetworkManager _networkManager;
+    [SerializeField] GameNetworkManager _gameNetwork;
+    [SerializeField] TileManager _tanager;
+    [SerializeField] GameObject _SelectServerTypeMenu;
+    [SerializeField] TMP_InputField _dice1;
+    [SerializeField] TMP_InputField _dice2;
+    [SerializeField] TMP_InputField _throwCount;//Plus
     void Start()
     {
-        networkManager.OnClientConnectedCallback += OnConnect;
+        _networkManager.OnClientConnectedCallback += OnConnect;
     }
 
     // Update is called once per frame
@@ -24,18 +25,26 @@ public class UINetworkSelection : MonoBehaviour
     }
     private void OnConnect(ulong a)
     {
-        SelectServerTypeMenu.SetActive(false);
+        _SelectServerTypeMenu.SetActive(false);
     }
     public void SelectHost()
     {
-        networkManager.StartHost();
+        _networkManager.StartHost();
     }
     public void SelectClient()
     {
-        networkManager.StartClient();
+        _networkManager.StartClient();
     }
-    public void DiceSet()//The list must be added to increase the number of dice.
+    public void DiceSet()
     {
-        gameNetwork.ThrowDiceServerRpc(networkManager.LocalClientId, int.Parse(dice1.text), int.Parse(dice2.text));
+        int diceCount1 = int.Parse(_dice1.text);
+        int diceCount2 = int.Parse(_dice2.text);
+        int throwCount = int.Parse(_throwCount.text);
+        if (diceCount1 > 6 || diceCount1 <= 0 || diceCount2 > 6 || diceCount2 <= 0 || throwCount < 1)//Game Rule
+        {
+            CaseLogger.Instance.Logger("Dice values and throw count cannot be less than 1. dice values cannot be greater than 6.", Color.red);
+            return;
+        }
+        _gameNetwork.ThrowDiceServerRpc(_networkManager.LocalClientId, diceCount1, diceCount2, throwCount);
     }
 }

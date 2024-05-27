@@ -10,9 +10,9 @@ public class DatabaseManager : MonoBehaviour
     private DatabaseReference _databaseReference;
     public static DatabaseManager Instance;
     public UnityEvent OnLoadData;
-    [HideInInspector] public PlayerData PlayerData;
+    [HideInInspector] public PlayerData PlayerData { get; private set; }
     public List<FruitData> FruitDatas;
-    void Start()
+    IEnumerator Start()
     {
         if(Instance == null)
         {
@@ -23,6 +23,7 @@ public class DatabaseManager : MonoBehaviour
             Destroy(gameObject);
         }
         DontDestroyOnLoad(gameObject);
+        yield return new WaitUntil(() => FirebaseInitializer.Auth != null);
         _databaseReference = FirebaseDatabase.DefaultInstance.RootReference;
         PlayerData = new PlayerData();
         PlayerData.InventoryDatas = new InventoryData[FruitDatas.Count];
@@ -37,7 +38,7 @@ public class DatabaseManager : MonoBehaviour
     {
         SavePlayerData(PlayerData);
     }
-    public void SavePlayerData(PlayerData playerData)
+    private void SavePlayerData(PlayerData playerData)
     {
         string json = JsonUtility.ToJson(playerData);
         _databaseReference.Child("users").Child(FirebaseInitializer.User.UserId).SetRawJsonValueAsync(json);
@@ -47,11 +48,6 @@ public class DatabaseManager : MonoBehaviour
         string json = JsonUtility.ToJson(inventoryData);
         _databaseReference.Child("users").Child(FirebaseInitializer.User.UserId)
             .Child("InventoryDatas").Child(index.ToString()).SetRawJsonValueAsync(json);
-    }
-    public void SaveTransformData(int tileIndex)
-    {
-        _databaseReference.Child("users").Child(FirebaseInitializer.User.UserId).Child("TileIndex").SetValueAsync(tileIndex);
-        PlayerData.TileIndex = tileIndex;
     }
     public void SaveAvatarData(int avatarIndex)
     {
@@ -108,6 +104,4 @@ public class PlayerData
     public string PlayerName;
     public InventoryData[] InventoryDatas;
     public int AvatarIndex;
-    public int TileIndex;
-
 }

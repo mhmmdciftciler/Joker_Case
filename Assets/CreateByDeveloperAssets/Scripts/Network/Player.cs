@@ -11,35 +11,46 @@ public class Player : NetworkBehaviour
     [SerializeField] private float _moveSpeed = 5f;
     [SerializeField] private TextMeshPro _playerNameText;
     private Animator _animator;
-    private bool isMoving = false;
+    private bool _isMoving = false;
     private TileManager _tileManager;
     private UIInventory _inventory;
-    public NetworkVariable<int> AvatarIndex = new NetworkVariable<int>();
-    public NetworkVariable<int> TileIndex = new NetworkVariable<int>();
-    public NetworkVariable<FixedString64Bytes> PlayerName = new NetworkVariable<FixedString64Bytes>();
+    private UIPlayerInfo _uIPlayerInfo;
+    public NetworkVariable<int> avatarIndex = new NetworkVariable<int>(writePerm: NetworkVariableWritePermission.Owner);
+    public NetworkVariable<int> tileIndex = new NetworkVariable<int>();//only can be write from server
+    public NetworkVariable<FixedString64Bytes> playerName = new NetworkVariable<FixedString64Bytes>(writePerm: NetworkVariableWritePermission.Owner);
     private Vector3 _targetPosition;
     private Vector3 _firstForward;
     private Vector3 _calculatedTarget;
     private int _targetTile;
     private Vector3 _camera;
     private PlayerData _playerData;
-    NetworkObjectHandler _networkObjectHandler;
-    NetworkTransform _transform;
+    private NetworkObjectHandler _networkObjectHandler;
+    private NetworkTransform _transform;
+    private GameAvatar _avatar;
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
         _networkObjectHandler = NetworkManager.gameObject.GetComponent<NetworkObjectHandler>();
         _tileManager = _networkObjectHandler.TileManager;
+        _uIPlayerInfo = _networkObjectHandler.UIPlayerInfo;
 
         if (IsOwner)
         {
             _playerData = DatabaseManager.Instance.PlayerData;
             _inventory = _networkObjectHandler.Inventory;
-            PlayerSyncServerRpc(DatabaseManager.Instance.PlayerData.PlayerName,
-                DatabaseManager.Instance.PlayerData.AvatarIndex);
             _playerNameText.text = DatabaseManager.Instance.PlayerData.PlayerName;
+            playerName.Value = DatabaseManager.Instance.PlayerData.PlayerName;
+            avatarIndex.Value = DatabaseManager.Instance.PlayerData.AvatarIndex;
+            SpawnAvatar();
+            _uIPlayerInfo.SetPlayerName(DatabaseManager.Instance.PlayerData.PlayerName, _avatar.avatarData.Icon);
+            for (int i = 0; i < DatabaseManager.Instance.PlayerData.InventoryDatas.Length; i++)
+            {
+                FruitData data = DatabaseManager.Instance.GetData(DatabaseManager.Instance.PlayerData.InventoryDatas[i].DataName);
+                _inventory.CreateOrSet(data, DatabaseManager.Instance.PlayerData.InventoryDatas[i].DataValue);
+            }
         }
+
         _transform = GetComponent<NetworkTransform>();
         StartCoroutine(NetworkSpawn());
         _camera = Camera.main.transform.position;
@@ -47,52 +58,49 @@ public class Player : NetworkBehaviour
 
     private void Update()
     {
-
-        if (isMoving)
+        if (_isMoving)
         {
             MoveTowardsTarget();
         }
     }
-    IEnumerator NetworkSpawn()
+    private IEnumerator NetworkSpawn()
     {
         yield return new WaitForSeconds(0.5f);
         if (IsServer)
         {
             gameObject.AddComponent<Rigidbody>().isKinematic = true;
-            TeleportToTileClientRpc(TileIndex.Value);
-            SpawnAvatarClientRpc(AvatarIndex.Value);
+            TeleportToTileClientRpc(tileIndex.Value);
         }
-        if (_animator == null)
+        if(_avatar == null)
         {
-            GameAvatar gameAvatar = Instantiate(_gameAvatars[AvatarIndex.Value], transform);
-            gameAvatar.transform.localEulerAngles = Vector3.zero;
-            gameAvatar.transform.localPosition = Vector3.zero;
-            _animator = gameAvatar.animator;
-            Tile tileObject = _tileManager.tiles[TileIndex.Value];
+            //Spawn clone avatar for other Clients
+            SpawnAvatar();
+            Tile tileObject = _tileManager.tiles[tileIndex.Value];
             transform.position = tileObject.transform.position;
-            _playerNameText.text = PlayerName.Value.ToString();
         }
     }
-    [ServerRpc(RequireOwnership = false)]
-    public void CalculateTargetAndMoveServerRpc(int diceValue)
+    internal void CalculateTargetAndMove(int diceValue)
     {
-        _tileManager.tiles[_targetTile].SetPlayerOnServerRpc(false);
-        _tileManager.tiles[_targetTile].SendSpawnFruitCallServerRpc();
-        _targetTile = diceValue + this.TileIndex.Value;
-        if (_targetTile >= _tileManager.tiles.Length)
+        if (IsServer)
         {
-            _calculatedTarget = _tileManager.tiles[_tileManager.tiles.Length - 1].transform.position;
-            _targetTile = diceValue + this.TileIndex.Value - _tileManager.tiles.Length;
-            _targetPosition = _tileManager.tiles[_targetTile].transform.position;
+            _tileManager.tiles[_targetTile].SetPlayerOnServerRpc(false);
+            _tileManager.tiles[_targetTile].SendSpawnFruitCallServerRpc();
+            _targetTile = diceValue + this.tileIndex.Value;
+            if (_targetTile >= _tileManager.tiles.Length)
+            {
+                _calculatedTarget = _tileManager.tiles[_tileManager.tiles.Length - 1].transform.position;
+                _targetTile = diceValue + this.tileIndex.Value - _tileManager.tiles.Length;
+                _targetPosition = _tileManager.tiles[_targetTile].transform.position;
+            }
+            else if (_targetTile < _tileManager.tiles.Length)
+            {
+                _calculatedTarget = _tileManager.tiles[_targetTile].transform.position;
+                _targetPosition = _tileManager.tiles[_targetTile].transform.position;
+            }
+            _isMoving = true;
+            UpdateRunAnimationClientRpc(true);
         }
-        else if (_targetTile < _tileManager.tiles.Length)
-        {
-            _calculatedTarget = _tileManager.tiles[_targetTile].transform.position;
-            _targetPosition = _tileManager.tiles[_targetTile].transform.position;
-        }
-        Debug.Log("targetTile : " + _targetTile);
-        isMoving = true;
-        UpdateRunAnimationClientRpc(true);
+
     }
 
     private void MoveTowardsTarget()
@@ -114,14 +122,10 @@ public class Player : NetworkBehaviour
 
             if (_calculatedTarget == _targetPosition)
             {
-                isMoving = false;
+                _isMoving = false;
                 UpdateRunAnimationClientRpc(false);
-                TileIndex.Value = _targetTile;
+                tileIndex.Value = _targetTile;
                 _tileManager.tiles[_targetTile].SetPlayerOnServerRpc(true);
-                //if(IsLocalPlayer)
-                //{
-                //    DatabaseManager.Instance.SaveTransformData(_targetTile);//not Recommended this game 
-                //}
             }
 
             if (IsOnTile(_tileManager.tiles.Length - 1) && _calculatedTarget != _targetPosition)
@@ -136,29 +140,16 @@ public class Player : NetworkBehaviour
 
     private bool IsOnTile(int tileIndex)
     {
-        // Tile objelerini bir dizi olarak kabul ediyoruz
         Tile tileObject = _tileManager.tiles[tileIndex];
         return Vector3.Distance(transform.position, tileObject.transform.position) < 0.1f;
     }
-    [ClientRpc]
-    private void SpawnAvatarClientRpc(int avatarIndex)
+    private void SpawnAvatar()
     {
-        Debug.Log("avatarIndex : " + avatarIndex);
-        GameAvatar gameAvatar = Instantiate(_gameAvatars[avatarIndex], transform);
-        gameAvatar.transform.localEulerAngles = Vector3.zero;
-        gameAvatar.transform.localPosition = Vector3.zero;
-        _animator = gameAvatar.animator;
-        _playerNameText.text = PlayerName.Value.ToString();
-        if (!IsLocalPlayer)
-            return;
-        _inventory.SetPlayerName(DatabaseManager.Instance.PlayerData.PlayerName, gameAvatar.avatarData.Icon);
-        for (int i = 0; i < DatabaseManager.Instance.PlayerData.InventoryDatas.Length; i++)
-        {
-            FruitData data = DatabaseManager.Instance.GetData(DatabaseManager.Instance.PlayerData.InventoryDatas[i].DataName);
-            _inventory.CreateOrSet(data, DatabaseManager.Instance.PlayerData.InventoryDatas[i].DataValue);
-        }
-
-
+        _avatar = Instantiate(_gameAvatars[avatarIndex.Value], transform);
+        _avatar.transform.localEulerAngles = Vector3.zero;
+        _avatar.transform.localPosition = Vector3.zero;
+        _animator = _avatar.animator;
+        _playerNameText.text = playerName.Value.ToString();
     }
     [ServerRpc(RequireOwnership = false)]
     private void TeleportToTileServerRpc(int tileIndex)
@@ -208,7 +199,6 @@ public class Player : NetworkBehaviour
     [ClientRpc(AllowTargetOverride = true)]
     public void CollectFruitClientRpc(int index, ClientRpcParams clientRpcParams = default)
     {
-        Debug.Log("Client collect");
         _playerData.InventoryDatas[index].DataValue += 1;
 
         _inventory.CreateOrSet(DatabaseManager.Instance.GetData(_playerData.InventoryDatas[index].DataName),
@@ -219,16 +209,6 @@ public class Player : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _tileManager.tiles[TileIndex.Value].SetPlayerOnServerRpc(false);
-    }
-    [ServerRpc(RequireOwnership = true)]
-    private void PlayerSyncServerRpc(string name, int avatarIndex)
-    {
-        if (IsServer)
-        {
-            PlayerName.Value = name;
-            AvatarIndex.Value = avatarIndex;
-        }
-
+        _tileManager.tiles[tileIndex.Value].SetPlayerOnServerRpc(false);
     }
 }

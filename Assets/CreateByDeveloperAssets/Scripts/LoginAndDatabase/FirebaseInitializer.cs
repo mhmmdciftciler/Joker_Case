@@ -9,11 +9,11 @@ public class FirebaseInitializer : MonoBehaviour
     public static FirebaseAuth Auth;
     public static FirebaseUser User;
     public UnityEvent OnFirebaseAppRun;
-    void Start()
+    void Awake()
     {
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
         {
-            if (task.IsCompleted&&task.Result == DependencyStatus.Available)
+            if (task.IsCompleted && task.Result == DependencyStatus.Available)
             {
                 Debug.Log("Firebase App Running");
                 Auth = FirebaseAuth.DefaultInstance;

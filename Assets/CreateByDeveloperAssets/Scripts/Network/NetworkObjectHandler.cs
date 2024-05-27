@@ -10,4 +10,5 @@ public class NetworkObjectHandler : MonoBehaviour
     public PoolManager PoolManager;
     public GameNetworkManager gameNetworkManager;
     public UIInventory Inventory;
+    public UIPlayerInfo UIPlayerInfo;
 }
