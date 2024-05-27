@@ -88,7 +88,7 @@ public class GameNetworkManager : NetworkBehaviour
         {
             this.dice1.ThrowDiceServerRpc(dice1);
             this.dice2.ThrowDiceServerRpc(dice2);
-            yield return new WaitForSeconds(3);//Animation finish
+            yield return new WaitForSeconds(5);//Animation finish
         }
         if (NetworkManager.Singleton.ConnectedClients.TryGetValue(player.Value, out NetworkClient client))
         {
